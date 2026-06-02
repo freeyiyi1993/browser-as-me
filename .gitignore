@@ -1,0 +1,27 @@
+# mandatory (opensource skill enforced)
+.env
+.env.*
+*.pem
+*.key
+.netrc
+secrets/
+credentials.json
+
+# editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tmp
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+
+# runtime
+/tmp/chrome-cdp.*.log

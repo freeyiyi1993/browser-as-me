@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Dedicated Chrome instance for CDP (remote-debugging-port=9222).
+  Install:
+    1. Replace REPLACE_HOME below with your absolute $HOME (e.g. /Users/yourname)
+       (launchd does not expand $HOME — paths must be absolute).
+    2. cp this file to ~/Library/LaunchAgents/com.local.chrome-cdp.plist
+    3. launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.local.chrome-cdp.plist
+    4. curl http://localhost:9222/json/version   # should return JSON
+  Uninstall:
+    launchctl bootout gui/$(id -u) ~/Library/LaunchAgents/com.local.chrome-cdp.plist
+-->
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.local.chrome-cdp</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Applications/Google Chrome.app/Contents/MacOS/Google Chrome</string>
+        <string>--remote-debugging-port=9222</string>
+        <string>--user-data-dir=REPLACE_HOME/.chrome-cdp-profile</string>
+        <string>--no-first-run</string>
+        <string>--no-default-browser-check</string>
+    </array>
+
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/tmp/chrome-cdp.out.log</string>
+
+    <key>StandardErrorPath</key>
+    <string>/tmp/chrome-cdp.err.log</string>
+</dict>
+</plist>
