@@ -25,3 +25,6 @@ venv/
 
 # runtime
 /tmp/chrome-cdp.*.log
+
+# opensource skill: local-only announce draft, not repo content
+ANNOUNCE.md
