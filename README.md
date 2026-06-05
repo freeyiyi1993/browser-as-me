@@ -28,11 +28,23 @@
 
 既然默认 profile 不让，**那就用一个不是默认的 profile**：`--user-data-dir=~/.chrome-cdp-profile`。这个 profile 完全独立——和你日常 Chrome 不共享 cookie / 历史 / 扩展 / 书签。
 
-代价：每个站第一次得**单独登一次**。收益：从此那个 session 是"你的"，长期驻留，AI 操作时不再问你要凭据。
+代价：每个站第一次需要在这个独立 Chrome 里登录。但因为可以**登同一个 Google 账号开同步**（密码 / 书签 / 扩展一键拉下来），实际上只需要点"登录"按钮 + 过 2FA，不是重新敲密码。如果不想开同步，也可以直接把日常 Chrome 的 `Cookies` 文件拷到 `~/.chrome-cdp-profile/Default/` 做一次性批量迁移（两个 profile 在同一台 Mac 上，解密用的是同一把 Keychain key，能直接读）。收益：一旦登好，那个 session 长期驻留，AI 操作时不再问你要凭据。
 
-### 3. 用 launchd 让它常驻
+### 3. 用 launchd 让它常驻（可选）
 
 Chrome 进程崩了 / 你 Cmd+Q 了 / 你重启 Mac 了——这些情况下你不希望 session 消失。launchd 的 `KeepAlive=true` 让这个 Chrome 进程死了自动复活；`RunAtLoad=true` 让登录就拉起。从你的视角，它就是"一直在那"。
+
+**不用 launchd 也完全能跑。**手动启动效果一样，session 复用 / profile 隔离 / CDP 这些核心能力一个不少：
+
+```bash
+/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome \
+  --remote-debugging-port=9222 \
+  --user-data-dir=$HOME/.chrome-cdp-profile \
+  --no-first-run \
+  --no-default-browser-check &
+```
+
+launchd 只省掉"重启后记得手动跑"和"不小心 Cmd+Q 了自己复活"这两个事。如果你已经有其他进程管理习惯（`crontab @reboot`、Hammerspoon 等），完全不需要 launchd。README 把它当默认只是因为 macOS 自带、零依赖。
 
 ### 4. context / page 复用
 
