@@ -154,3 +154,76 @@ async def main():
 
 asyncio.run(main())
 ```
+
+## 10. 反检测 + 拟人行为（强风控站，如电商 / 内容社区）
+
+**何时用**：目标站会基于 `navigator.webdriver`、行为指纹、请求时序等做反爬判定。症状：登录态在但搜不出结果、403、「访问频繁」、账号被封限流。
+
+**前置**：`pip install playwright-stealth`
+
+```python
+#!/usr/bin/env python3
+import random, time, urllib.parse
+from playwright.sync_api import sync_playwright
+from playwright_stealth import Stealth
+
+def jitter(low=0.4, high=1.2):
+    time.sleep(random.uniform(low, high))
+
+def mouse_wiggle(page, n=None):
+    """随机鼠标小幅移动, 模拟空闲手。"""
+    for _ in range(n or random.randint(2, 4)):
+        page.mouse.move(random.randint(200, 1000), random.randint(200, 600),
+                        steps=random.randint(8, 20))
+        jitter(0.2, 0.6)
+
+def human_scroll(page, steps=5):
+    """wheel-based 滚动, 不要直接 scrollTo(bottom)。"""
+    for _ in range(steps):
+        page.mouse.wheel(0, random.randint(300, 700))
+        jitter(0.6, 1.8)
+
+KEYWORD = "你的关键词"
+SEARCH_URL = f"https://target.com/search?q={urllib.parse.quote(KEYWORD)}"
+
+# Stealth.use_sync 包裹 sync_playwright → 自动给 new_page() 注入 init script
+with Stealth().use_sync(sync_playwright()) as pw:
+    browser = pw.chromium.connect_over_cdp("http://localhost:9222")
+    ctx = browser.contexts[0]
+    page = ctx.new_page()
+    try:
+        # 关键: 先访问主页打热 referer, 再跳目标; 不要"主页都没看过直接深链 jump"
+        page.goto("https://target.com/", wait_until="domcontentloaded", timeout=30000)
+        jitter(1.5, 3.0)
+        mouse_wiggle(page)
+        jitter(0.8, 1.5)
+
+        page.goto(SEARCH_URL, wait_until="domcontentloaded", timeout=30000)
+        jitter(2.0, 3.5)
+        mouse_wiggle(page)
+        human_scroll(page, steps=4)
+
+        # blocked 自检
+        body = page.evaluate("() => document.body.innerText.slice(0, 500)")
+        if any(k in body for k in ["访问频繁", "异常", "登录后查看", "稍后再试", "验证"]):
+            raise SystemExit(f"BLOCKED: {body[:200]}")
+
+        # stealth 是否生效自检 (第一次接新站必跑一次)
+        fp = page.evaluate("() => ({wd: navigator.webdriver, "
+                           "plugins: navigator.plugins.length, "
+                           "langs: navigator.languages})")
+        assert fp["wd"] is False, f"webdriver leak: {fp}"
+
+        # ... 真正的抓取逻辑 ...
+    finally:
+        page.close()
+```
+
+**反检测纪律 (按命中风险从高到低)**
+
+| 反模式 | 触发什么 | 改成 |
+|---|---|---|
+| `connect_over_cdp` 无 stealth → `navigator.webdriver = true` | 一行 JS 就识破 | `Stealth().use_sync(...)` 包裹 |
+| `goto` → 立即 `evaluate` | 0 dwell, 行为指纹异常 | jitter 1.5-3s + mouse_wiggle |
+| `window.scrollTo(0, height)` 瞬时到底 | 滚动速度异常 | `mouse.wheel` 多步 + 每步 jitter |
+| 没访问主页直接深链 / 搜索 URL | 缺 referer + session 路径不自然 | 先 `goto(homepage)` 暖身 |

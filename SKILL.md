@@ -21,6 +21,18 @@ Chrome 2024 mid 加了安全策略：`--remote-debugging-port` 在**默认 user-
 
 ## 执行流程
 
+### Step 0: 先查 workflows/index.md 看历史是否有可复用的流程
+
+```bash
+cat ~/.claude/skills/browser-as-me/workflows/index.md 2>/dev/null
+```
+
+`index.md` 是所有场景一张表（场景 slug + 触发短语 + 关键产物）。只读 index.md，不要 ls 全目录。
+
+命中后进入 `workflows/<slug>/README.md` 读完整流程。如果 index 不存在或没匹配 → 按 Step 1 起手，结束后回 Step 6 沉淀。
+
+> 公版 fork 默认 workflows/ 为空（业务场景大多是私有信息）；用户自己用时按 Step 6 累积自己的 workflow 库。
+
 ### Step 1: 确认 CDP 可用
 
 ```bash
@@ -78,6 +90,20 @@ with sync_playwright() as pw:
 ```
 
 回 2 → 给用户 SKILL.md diff，确认后写入 + 加 evolution log。
+
+### Step 6: 沉淀 workflow（任务完成后强制做）
+
+把本次任务沉淀成 `workflows/<scenario-slug>/README.md`（每场景独立子目录），方便下次复用：
+
+1. 查 `workflows/index.md` 现状：
+   - **有且基本一致** → 不动
+   - **有但本次有新坑 / 新优化** → 更新对应 `<slug>/README.md`，末尾追加 changelog
+   - **有但本次走的是同场景下的不同分支** → 加 `## 分支：<情况>` section
+   - **完全没有** → 创建 `workflows/<slug>/` + README.md + **在 index.md 表里加一行**
+2. 两份 workflow 高度雷同 → 合并
+3. 场景配套的脚本 / 数据 / SOP 都放本子目录（不散到 `scripts/` 或 `references/`）
+
+模板见 `workflows/README.md`。
 
 ## 参数 / CLI
 
@@ -139,3 +165,4 @@ CDP Chrome 自带「容易抢焦点」属性 —— `bring_to_front()` / 新 tab
 ## evolution log
 
 - 2026-06-05 · 加「不要 `bring_to_front()`」反模式 + 「Space 隔离」段落。源自 cigna 报销 session 实战：每次填表 / 截图前习惯性 `bring_to_front()`，多次打断用户在 Mac 上正在做的事。事后核对：本次所有操作（fill/click/screenshot/set_input_files/keyboard.press("Escape")）其实都不需要前台，`bring_to_front()` 是纯多余。
+- 2026-06-19 · 加「workflows/ 自我沉淀」机制：Step 0 起手先查历史 workflow，Step 6 结尾必沉淀，多份雷同自动合并。同时把「不抢焦点」实施到代码：`scripts/cdp` 改用 raw CDP `Target.createTarget {background:true}`；`scripts/ensure_chrome.sh` 加 frontmost app 抓取 + EXIT trap 还焦点；新增 `scripts/cdp_background.py` standalone helper。同步私版 → 公版 fork。

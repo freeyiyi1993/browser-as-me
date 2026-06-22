@@ -129,9 +129,10 @@ with sync_playwright() as pw:
 
 把这个目录放到 `~/.claude/skills/browser-as-me/`。`SKILL.md` 的 frontmatter 已经声明了触发短语（"用我的浏览器"、"use my logged-in browser" 等）。完整的 agent 契约见 [SKILL.md](./SKILL.md)。
 
-### 更多 Playwright 配方
+### 更多 Playwright 配方 / 业务 workflow
 
-`references/recipes.md` 含 9 个开箱即用片段：连接 + cookie dump、XHR 拦截拿原始 JSON、操作已存在的 tab、SSO 跳转处理、async 版本等。
+- `references/recipes.md` — 10 个开箱即用片段：连接 + cookie dump、XHR 拦截拿原始 JSON、操作已存在的 tab、SSO 跳转处理、async、反检测拟人行为等。
+- `workflows/<scenario>.md` — 每个真实业务场景一份 workflow 模板（场景 / 决策点 / 步骤 / 易踩坑）。新任务前先 `ls workflows/` 查命中。
 
 ---
 
@@ -146,9 +147,12 @@ browser-as-me/
 │   └── com.local.chrome-cdp.plist   # launchd plist 模板（装之前替换 REPLACE_HOME）
 ├── scripts/
 │   ├── ensure_chrome.sh     # 幂等的「CDP 通吗?不通就重启」探针
-│   └── cdp                  # 小型 Python CLI, 覆盖高频单点操作
-└── references/
-    └── recipes.md           # 可复制粘贴的 Playwright 片段
+│   ├── cdp                  # 小型 Python CLI, 覆盖高频单点操作
+│   └── cdp_background.py    # background-page context manager（不抢焦点）
+├── references/
+│   └── recipes.md           # 可复制粘贴的 Playwright 片段（10 个场景 cookbook）
+└── workflows/
+    └── <scenario>.md        # 每个真实业务场景一份 workflow 模板
 ```
 
 ---

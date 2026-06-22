@@ -7,6 +7,7 @@ writing playwright code directly. This CLI covers the high-frequency one-shots.
 import argparse
 import json
 import sys
+from contextlib import contextmanager
 from playwright.sync_api import sync_playwright
 
 CDP_URL = "http://localhost:9222"
@@ -18,6 +19,27 @@ def _connect(pw):
         print("ERROR: no contexts in CDP Chrome — should be impossible", file=sys.stderr)
         sys.exit(2)
     return browser, browser.contexts[0]
+
+
+@contextmanager
+def _background_page(browser, ctx, timeout=10000):
+    """Open a new tab WITHOUT raising Chrome's window on macOS.
+
+    playwright's ctx.new_page() activates the Chrome window. Going through raw
+    CDP Target.createTarget with background=true keeps it in the back, and
+    page.goto() on an already-attached page doesn't activate either.
+    """
+    session = browser.new_browser_cdp_session()
+    with ctx.expect_page(timeout=timeout) as info:
+        session.send("Target.createTarget", {"url": "about:blank", "background": True})
+    page = info.value
+    try:
+        yield page
+    finally:
+        try:
+            page.close()
+        except Exception:
+            pass
 
 
 def cmd_list_tabs(_args):
@@ -32,23 +54,24 @@ def cmd_list_tabs(_args):
 
 
 def cmd_open(args):
+    # cmd_open leaves the tab around for the user; don't auto-close.
     with sync_playwright() as pw:
-        _, ctx = _connect(pw)
-        page = ctx.new_page()
+        browser, ctx = _connect(pw)
+        session = browser.new_browser_cdp_session()
+        with ctx.expect_page(timeout=10000) as info:
+            session.send("Target.createTarget", {"url": "about:blank", "background": True})
+        page = info.value
         page.goto(args.url, wait_until="domcontentloaded", timeout=30000)
         print(f"opened: {page.url}")
 
 
 def cmd_screenshot(args):
     with sync_playwright() as pw:
-        _, ctx = _connect(pw)
-        page = ctx.new_page()
-        try:
+        browser, ctx = _connect(pw)
+        with _background_page(browser, ctx) as page:
             page.goto(args.url, wait_until="networkidle", timeout=30000)
             page.screenshot(path=args.out, full_page=args.full)
             print(f"saved: {args.out}")
-        finally:
-            page.close()
 
 
 def cmd_cookie(args):
@@ -62,14 +85,11 @@ def cmd_cookie(args):
 
 def cmd_exec(args):
     with sync_playwright() as pw:
-        _, ctx = _connect(pw)
-        page = ctx.new_page()
-        try:
+        browser, ctx = _connect(pw)
+        with _background_page(browser, ctx) as page:
             page.goto(args.url, wait_until="domcontentloaded", timeout=30000)
             result = page.evaluate(args.js)
             print(json.dumps(result, ensure_ascii=False, default=str))
-        finally:
-            page.close()
 
 
 def main():

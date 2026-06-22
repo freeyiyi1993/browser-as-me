@@ -18,12 +18,21 @@ fi
 
 echo "CDP not responding, kickstarting LaunchAgent..."
 
+# Capture frontmost app so we can restore focus after Chrome launches and grabs it.
+FRONT_BID=$(osascript -e 'tell application "System Events" to get bundle identifier of first application process whose frontmost is true' 2>/dev/null || true)
+
 if ! launchctl print "gui/$(id -u)/${LABEL}" > /dev/null 2>&1; then
     echo "LaunchAgent not loaded, bootstrapping..."
     launchctl bootstrap "gui/$(id -u)" "$PLIST"
-else
-    launchctl kickstart -k "gui/$(id -u)/${LABEL}"
 fi
+launchctl kickstart -k "gui/$(id -u)/${LABEL}"
+
+restore_focus() {
+    if [[ -n "${FRONT_BID:-}" && "$FRONT_BID" != "com.google.Chrome" ]]; then
+        osascript -e "tell application id \"$FRONT_BID\" to activate" >/dev/null 2>&1 || true
+    fi
+}
+trap restore_focus EXIT
 
 for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15; do
     if check_cdp; then
