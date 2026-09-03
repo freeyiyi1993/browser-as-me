@@ -29,9 +29,11 @@ cat ~/.claude/skills/browser-as-me/workflows/index.md 2>/dev/null
 
 `index.md` 是所有场景一张表（场景 slug + 触发短语 + 关键产物）。只读 index.md，不要 ls 全目录。
 
-命中后进入 `workflows/<slug>/README.md` 读完整流程。如果 index 不存在或没匹配 → 按 Step 1 起手，结束后回 Step 6 沉淀。
+命中后进入 `workflows/<slug>/README.md` 读完整流程。每份 README 都应包含场景、关键参数、决策点、步骤、输出物和易踩坑。
 
-> 公版 fork 默认 workflows/ 为空（业务场景大多是私有信息）；用户自己用时按 Step 6 累积自己的 workflow 库。
+如果 index 不存在或没匹配 → 按 Step 1 起手；任务结束后回 Step 6 沉淀新 workflow。
+
+> 公版不内置任何具体业务 workflow；用户可在本地维护自己的 workflow 库，避免把账号、公司或业务数据提交到公共仓库。
 
 ### Step 1: 确认 CDP 可用
 
@@ -40,7 +42,7 @@ cat ~/.claude/skills/browser-as-me/workflows/index.md 2>/dev/null
 ```
 
 - 9222 通 → OK，继续
-- 不通 → 脚本会自动 `launchctl kickstart` 重启 LaunchAgent，再等最多 15 秒
+- 不通 → 脚本会按需 `launchctl bootstrap` / `kickstart` 启动 LaunchAgent，再等最多 15 秒
 - 仍不通 → 报错，让用户 `launchctl print gui/$UID/com.local.chrome-cdp` 自查
 
 ### Step 2: 列 tabs 看看用户在 CDP Chrome 里有什么
@@ -91,19 +93,19 @@ with sync_playwright() as pw:
 
 回 2 → 给用户 SKILL.md diff，确认后写入 + 加 evolution log。
 
-### Step 6: 沉淀 workflow（任务完成后强制做）
+### Step 6: 沉淀 workflow（本地使用时）
 
-把本次任务沉淀成 `workflows/<scenario-slug>/README.md`（每场景独立子目录），方便下次复用：
+把本次任务沉淀成 `workflows/<scenario-slug>/README.md`（每场景独立子目录），方便本地下次复用。公开仓库只保留泛化模板，不提交包含账号、公司或业务数据的 workflow：
 
 1. 查 `workflows/index.md` 现状：
    - **有且基本一致** → 不动
    - **有但本次有新坑 / 新优化** → 更新对应 `<slug>/README.md`，末尾追加 changelog
    - **有但本次走的是同场景下的不同分支** → 加 `## 分支：<情况>` section
-   - **完全没有** → 创建 `workflows/<slug>/` + README.md + **在 index.md 表里加一行**
+   - **完全没有** → 在本地创建 `workflows/<slug>/` + README.md + **在 index.md 表里加一行**；不要将具体业务流程提交到公共仓库
 2. 两份 workflow 高度雷同 → 合并
 3. 场景配套的脚本 / 数据 / SOP 都放本子目录（不散到 `scripts/` 或 `references/`）
 
-模板见 `workflows/README.md`。
+模板见 `workflows/README.md`。如果同一场景已有 workflow，优先在原 workflow 增加分支或 changelog；发现高度重复的 workflow 时合并，避免两份流程漂移。
 
 ## 参数 / CLI
 
@@ -125,6 +127,8 @@ CDP Chrome 自带「容易抢焦点」属性 —— `bring_to_front()` / 新 tab
 2. **环境层**（一次性手动设置）：把 CDP Chrome 窗口拖到独立 Space。Mission Control 打开 → 把 CDP Chrome 拖到 Desktop 2 固定。日常工作在 Desktop 1，CDP 怎么 activate 都在另一个 Space，不会跨 Space 抢焦点。需要人眼看 CDP（OTP 输入 / WhatsApp QR 扫码）时手动 `ctrl + →` 切过去。
 
 剩下 5% 真的需要 activate 的场景（如某些站要求 window focused 才发某个事件、或用户交互），用 `osascript -e 'tell application "Google Chrome" to activate'` 显式拉起，告诉用户「我现在需要切过去看一下」，而不是后台静默抢焦点。
+
+**macOS TCC 注意**：默认不要为了恢复焦点调用 `osascript` / `System Events`。macOS 14+ 可能将这类跨 app Apple Events 归为 “access data from other apps” 并触发权限弹窗。只有用户明确接受这个权限成本时，才通过显式开关启用焦点恢复。
 
 ## 故障处理
 
@@ -164,5 +168,6 @@ CDP Chrome 自带「容易抢焦点」属性 —— `bring_to_front()` / 新 tab
 
 ## evolution log
 
-- 2026-06-05 · 加「不要 `bring_to_front()`」反模式 + 「Space 隔离」段落。源自 cigna 报销 session 实战：每次填表 / 截图前习惯性 `bring_to_front()`，多次打断用户在 Mac 上正在做的事。事后核对：本次所有操作（fill/click/screenshot/set_input_files/keyboard.press("Escape")）其实都不需要前台，`bring_to_front()` 是纯多余。
+- 2026-06-05 · 加「不要 `bring_to_front()`」反模式 + 「Space 隔离」段落。源自一次真实业务 session：每次填表 / 截图前习惯性 `bring_to_front()`，多次打断用户在 Mac 上正在做的事。事后核对：本次所有操作（fill/click/screenshot/set_input_files/keyboard.press("Escape")）其实都不需要前台，`bring_to_front()` 是纯多余。
 - 2026-06-19 · 加「workflows/ 自我沉淀」机制：Step 0 起手先查历史 workflow，Step 6 结尾必沉淀，多份雷同自动合并。同时把「不抢焦点」实施到代码：`scripts/cdp` 改用 raw CDP `Target.createTarget {background:true}`；`scripts/ensure_chrome.sh` 加 frontmost app 抓取 + EXIT trap 还焦点；新增 `scripts/cdp_background.py` standalone helper。同步私版 → 公版 fork。
+- 2026-08-18 · 将 `ensure_chrome.sh` 的焦点恢复改为显式开关，默认不调用 Apple Events，减少 macOS TCC 权限弹窗。

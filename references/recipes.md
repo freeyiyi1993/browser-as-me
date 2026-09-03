@@ -227,3 +227,27 @@ with Stealth().use_sync(sync_playwright()) as pw:
 | `goto` → 立即 `evaluate` | 0 dwell, 行为指纹异常 | jitter 1.5-3s + mouse_wiggle |
 | `window.scrollTo(0, height)` 瞬时到底 | 滚动速度异常 | `mouse.wheel` 多步 + 每步 jitter |
 | 没访问主页直接深链 / 搜索 URL | 缺 referer + session 路径不自然 | 先 `goto(homepage)` 暖身 |
+
+补充纪律：
+
+| 反模式 | 风险 | 建议 |
+|---|---|---|
+| 同一账号短时间重复运行 | 触发限流或账号风控 | 降低频率；失败后停止重试并等待冷却 |
+| 所有 selector 都无限等待 | 限流后继续请求，放大风险 | 设置合理 timeout；失败后退出并记录原因 |
+| 只抓取、不做必要的页面停留 | 行为轨迹单一 | 只在业务确实需要时打开详情并短暂停留 |
+
+**Stealth 验证模板**（接入新站时先做一次）：
+
+```python
+print(page.evaluate("() => ({"
+    "wd: navigator.webdriver,"
+    "plugins: navigator.plugins.length,"
+    "langs: navigator.languages,"
+    "ua: navigator.userAgent,"
+    "vendor: navigator.vendor,"
+    "platform: navigator.platform"
+"})"))
+# 期望：wd=false、plugins>0、langs 非空，且 UA/vendor/platform 与真实 Chrome 一致
+```
+
+如果页面出现明确的 blocked / rate-limit 提示，应停止当前任务，不要继续尝试。
